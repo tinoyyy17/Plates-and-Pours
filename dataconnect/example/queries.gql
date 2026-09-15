@@ -1,0 +1,134 @@
+mutation CreateRestaurant @auth(level: USER) {
+  restaurant_insert(data: {name: "Gourmet Kitchen", address: "123 Food St"})
+}
+
+mutation UpdateRestaurant($id: UUID!, $name: String) @auth(level: USER) {
+  restaurant_update(key: {id: $id}, data: {name: $name})
+}
+
+mutation DeleteRestaurant($id: UUID!) @auth(level: USER) {
+  restaurant_delete(key: {id: $id})
+}
+
+query GetRestaurant($id: UUID!) @auth(level: PUBLIC, insecureReason: "Public restaurant directory.") {
+  restaurant(id: $id) {
+    name
+    address
+  }
+}
+
+query ListRestaurants @auth(level: PUBLIC, insecureReason: "Public restaurant directory.") {
+  restaurants {
+    id
+    name
+  }
+}
+
+mutation CreateCategory($name: String!, $sortOrder: Int!, $restaurantId: UUID!) @auth(level: USER) {
+  category_insert(data: {name: $name, sortOrder: $sortOrder, restaurantId: $restaurantId})
+}
+
+mutation UpdateCategory($id: UUID!, $sortOrder: Int) @auth(level: USER) {
+  category_update(key: {id: $id}, data: {sortOrder: $sortOrder})
+}
+
+mutation DeleteCategory($id: UUID!) @auth(level: USER) {
+  category_delete(key: {id: $id})
+}
+
+query GetCategory($id: UUID!) @auth(level: PUBLIC, insecureReason: "Public category information.") {
+  category(id: $id) {
+    name
+    restaurant {
+      name
+    }
+  }
+}
+
+query ListCategories @auth(level: PUBLIC, insecureReason: "Public category directory.") {
+  categories {
+    id
+    name
+  }
+}
+
+mutation CreateMenuItem($name: String!, $price: Float!, $isAvailable: Boolean!, $categoryId: UUID!) @auth(level: USER) {
+  menuItem_insert(data: {name: $name, price: $price, isAvailable: $isAvailable, categoryId: $categoryId})
+}
+
+mutation UpdateMenuItem($id: UUID!, $isAvailable: Boolean) @auth(level: USER) {
+  menuItem_update(key: {id: $id}, data: {isAvailable: $isAvailable})
+}
+
+mutation DeleteMenuItem($id: UUID!) @auth(level: USER) {
+  menuItem_delete(key: {id: $id})
+}
+
+query GetMenuItem($id: UUID!) @auth(level: PUBLIC, insecureReason: "Public menu information.") {
+  menuItem(id: $id) {
+    name
+    price
+    category {
+      name
+    }
+  }
+}
+
+query ListMenuItems @auth(level: PUBLIC, insecureReason: "Public menu information.") {
+  menuItems {
+    id
+    name
+  }
+}
+
+mutation CreateMenuItemOption($name: String!, $priceAdjustment: Float!, $menuItemId: UUID!) @auth(level: USER) {
+  menuItemOption_insert(data: {name: $name, priceAdjustment: $priceAdjustment, menuItemId: $menuItemId})
+}
+
+mutation UpdateMenuItemOption($id: UUID!, $priceAdjustment: Float) @auth(level: USER) {
+  menuItemOption_update(key: {id: $id}, data: {priceAdjustment: $priceAdjustment})
+}
+
+mutation DeleteMenuItemOption($id: UUID!) @auth(level: USER) {
+  menuItemOption_delete(key: {id: $id})
+}
+
+query GetMenuItemOption($id: UUID!) @auth(level: PUBLIC, insecureReason: "Public menu option info.") {
+  menuItemOption(id: $id) {
+    name
+    priceAdjustment
+  }
+}
+
+query ListMenuItemOptions @auth(level: PUBLIC, insecureReason: "Public menu option info.") {
+  menuItemOptions {
+    id
+    name
+  }
+}
+
+mutation CreateTable($tableNumber: Int!, $qrCodeUrl: String!, $restaurantId: UUID!) @auth(level: USER) {
+  table_insert(data: {tableNumber: $tableNumber, qrCodeUrl: $qrCodeUrl, restaurantId: $restaurantId})
+}
+
+mutation UpdateTable($id: UUID!, $qrCodeUrl: String) @auth(level: USER) {
+  table_update(key: {id: $id}, data: {qrCodeUrl: $qrCodeUrl})
+}
+
+mutation DeleteTable($id: UUID!) @auth(level: USER) {
+  table_delete(key: {id: $id})
+}
+
+query GetTable($id: UUID!) @auth(level: PUBLIC, insecureReason: "Public table mapping.") {
+  table(id: $id) {
+    tableNumber
+    qrCodeUrl
+  }
+}
+
+query ListTables @auth(level: PUBLIC, insecureReason: "Public table mapping.") {
+  tables {
+    id
+    tableNumber
+  }
+}

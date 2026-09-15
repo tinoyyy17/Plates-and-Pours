@@ -1,0 +1,22 @@
+name: plates_and_pours_web
+description: Table-side QR ordering web app for Plates & Pours Garden Resto and Café
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cloud_firestore: ^5.4.0
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

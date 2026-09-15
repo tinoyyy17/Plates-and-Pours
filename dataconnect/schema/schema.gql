@@ -1,0 +1,34 @@
+type Restaurant @table {
+  name: String!
+  address: String!
+  logoUrl: String
+  contactPhone: String
+}
+
+type Category @table {
+  name: String!
+  sortOrder: Int!
+  restaurant: Restaurant!
+}
+
+type MenuItem @table {
+  name: String!
+  price: Float!
+  isAvailable: Boolean!
+  description: String
+  imageUrl: String
+  dietaryTags: String
+  category: Category!
+}
+
+type MenuItemOption @table {
+  name: String!
+  priceAdjustment: Float!
+  menuItem: MenuItem!
+}
+
+type Table @table {
+  tableNumber: Int!
+  qrCodeUrl: String!
+  restaurant: Restaurant!
+}

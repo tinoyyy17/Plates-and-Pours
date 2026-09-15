@@ -1,0 +1,30 @@
+mutation SeedDatabase @transaction {
+  restaurant_insertMany(data: [
+    { name: "Burger Haven", address: "123 Main St", contactPhone: "555-0101" },
+    { name: "Pasta Palace", address: "456 Oak Ave", contactPhone: "555-0202" },
+    { name: "Sushi Spot", address: "789 Pine Rd", contactPhone: "555-0303" }
+  ])
+  category_insertMany(data: [
+    { name: "Burgers", sortOrder: 1, restaurant: { id: "00000000-0000-0000-0000-000000000001" } },
+    { name: "Sides", sortOrder: 2, restaurant: { id: "00000000-0000-0000-0000-000000000001" } },
+    { name: "Pasta", sortOrder: 1, restaurant: { id: "00000000-0000-0000-0000-000000000002" } },
+    { name: "Rolls", sortOrder: 1, restaurant: { id: "00000000-0000-0000-0000-000000000003" } }
+  ])
+  menuItem_insertMany(data: [
+    { name: "Classic Burger", price: 9.99, isAvailable: true, category: { id: "00000000-0000-0000-0000-000000000001" } },
+    { name: "Fries", price: 3.99, isAvailable: true, category: { id: "00000000-0000-0000-0000-000000000002" } },
+    { name: "Spaghetti", price: 12.50, isAvailable: true, category: { id: "00000000-0000-0000-0000-000000000003" } },
+    { name: "California Roll", price: 8.00, isAvailable: true, category: { id: "00000000-0000-0000-0000-000000000004" } }
+  ])
+  menuItemOption_insertMany(data: [
+    { name: "Extra Cheese", priceAdjustment: 1.50, menuItem: { id: "00000000-0000-0000-0000-000000000001" } },
+    { name: "Large Size", priceAdjustment: 2.00, menuItem: { id: "00000000-0000-0000-0000-000000000002" } },
+    { name: "Extra Meatball", priceAdjustment: 3.00, menuItem: { id: "00000000-0000-0000-0000-000000000003" } }
+  ])
+  table_insertMany(data: [
+    { tableNumber: 1, qrCodeUrl: "https://qr.example.com/1", restaurant: { id: "00000000-0000-0000-0000-000000000001" } },
+    { tableNumber: 2, qrCodeUrl: "https://qr.example.com/2", restaurant: { id: "00000000-0000-0000-0000-000000000001" } },
+    { tableNumber: 1, qrCodeUrl: "https://qr.example.com/3", restaurant: { id: "00000000-0000-0000-0000-000000000002" } },
+    { tableNumber: 1, qrCodeUrl: "https://qr.example.com/4", restaurant: { id: "00000000-0000-0000-0000-000000000003" } }
+  ])
+}
