@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "plates-and-pours-database"
-  }
+    "platesandpours": "platesandpours"
+  },
+  "targets": {},
+  "etags": {}
 }

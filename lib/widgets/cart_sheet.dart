@@ -6,12 +6,14 @@ import '../theme/app_theme.dart';
 /// and confirms the order — the "Select Items & Finalize Cart" step.
 class CartSheet extends StatelessWidget {
   final List<CartLine> cart;
+  final bool isSubmitting;
   final void Function(CartLine line, int delta) onAdjust;
   final VoidCallback onSubmit;
 
   const CartSheet({
     super.key,
     required this.cart,
+    required this.isSubmitting,
     required this.onAdjust,
     required this.onSubmit,
   });
@@ -95,15 +97,22 @@ class CartSheet extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: cart.isEmpty ? null : onSubmit,
+                onPressed: (cart.isEmpty || isSubmitting) ? null : onSubmit,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.gold,
+                  disabledBackgroundColor: AppColors.border,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: Text('Place order', style: text.labelLarge),
+                child: isSubmitting
+                    ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.forest),
+                )
+                    : Text('Place order', style: text.labelLarge),
               ),
             ),
           ],

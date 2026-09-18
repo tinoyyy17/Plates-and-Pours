@@ -21,25 +21,13 @@ class DefaultFirebaseOptions {
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for android - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return ios;
       case TargetPlatform.macOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for macos - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return macos;
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -53,12 +41,47 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyAKp2ibZw_Ywu5LtHxm_LCjn5nurpa3fpU',
-    appId: '1:1043599037004:web:50642c7518206afcd55ae9',
-    messagingSenderId: '1043599037004',
-    projectId: 'plates-and-pours-database',
-    authDomain: 'plates-and-pours-database.firebaseapp.com',
-    storageBucket: 'plates-and-pours-database.firebasestorage.app',
-    measurementId: 'G-FKNZBF9ERX',
+    apiKey: 'AIzaSyB2zlLW7OUTYEi-gkzONmz9wYIPgqlH5XA',
+    appId: '1:789517333866:web:5fb492c23ec1e23521e113',
+    messagingSenderId: '789517333866',
+    projectId: 'platesandpours',
+    authDomain: 'platesandpours.firebaseapp.com',
+    storageBucket: 'platesandpours.firebasestorage.app',
+    measurementId: 'G-3ECZ4ZV67P',
+  );
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'AIzaSyB1SRmwjlfqGwc_yOjq1_uYVmv7aAn7rQA',
+    appId: '1:789517333866:ios:c14a6867b538c15d21e113',
+    messagingSenderId: '789517333866',
+    projectId: 'platesandpours',
+    storageBucket: 'platesandpours.firebasestorage.app',
+    iosBundleId: 'com.example.platesAndPoursWeb',
+  );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyB1SRmwjlfqGwc_yOjq1_uYVmv7aAn7rQA',
+    appId: '1:789517333866:ios:c14a6867b538c15d21e113',
+    messagingSenderId: '789517333866',
+    projectId: 'platesandpours',
+    storageBucket: 'platesandpours.firebasestorage.app',
+    iosBundleId: 'com.example.platesAndPoursWeb',
+  );
+
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: 'AIzaSyB1SRmwjlfqGwc_yOjq1_uYVmv7aAn7rQA',
+    appId: '1:789517333866:android:25d4bd833a27022321e113',
+    messagingSenderId: '789517333866',
+    projectId: 'platesandpours',
+    storageBucket: 'platesandpours.firebasestorage.app',
+  );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyB1SRmwjlfqGwc_yOjq1_uYVmv7aAn7rQA',
+    appId: '1:789517333866:web:5b91c74d04ca73f521e113',
+    messagingSenderId: '789517333866',
+    projectId: 'platesandpours',
+    authDomain: 'platesandpours.firebaseapp.com',
+    storageBucket: 'platesandpours.firebasestorage.app',
+    measurementId: 'G-EEZ1H6TR9L',
   );
 }

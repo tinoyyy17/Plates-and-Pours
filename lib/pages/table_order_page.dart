@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/menu_item.dart';
 import '../services/order_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/cart_sheet.dart';
 import '../widgets/item_detail_sheet.dart';
 import 'pending_orders_page.dart';
+import 'profile_page.dart';
 
 class TableOrderPage extends StatefulWidget {
   const TableOrderPage({super.key});
@@ -71,6 +73,16 @@ class _TableOrderPageState extends State<TableOrderPage> {
   int get _itemCount => _cart.fold(0, (sum, l) => sum + l.quantity);
   double get _cartTotal => _cart.fold(0, (sum, l) => sum + l.subtotal);
 
+  /// Shown bottom-left when the cart is empty — the customer's username if
+  /// they're logged in, or "Browsing as guest" for anonymous sessions.
+  String get _identityLabel {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.isAnonymous) return 'Browsing as guest';
+    final name = user.displayName;
+    final label = (name != null && name.isNotEmpty) ? name : (user.email ?? 'there');
+    return 'Hi, $label';
+  }
+
   Future<void> _submitOrder() async {
     final orderId = await _orderService.submitOrder(tableId: _tableId, cart: _cart);
     if (!mounted) return;
@@ -82,6 +94,7 @@ class _TableOrderPageState extends State<TableOrderPage> {
   }
 
   void _openCart() {
+    bool isSubmitting = false;
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.white,
@@ -91,11 +104,25 @@ class _TableOrderPageState extends State<TableOrderPage> {
       builder: (context) => StatefulBuilder(
         builder: (context, setSheetState) => CartSheet(
           cart: _cart,
+          isSubmitting: isSubmitting,
           onAdjust: (line, delta) {
             _adjustLine(line, delta);
             setSheetState(() {});
           },
-          onSubmit: _submitOrder,
+          onSubmit: () async {
+            if (isSubmitting) return; // already in flight — ignore extra taps
+            setSheetState(() => isSubmitting = true);
+            try {
+              await _submitOrder(); // pops the sheet itself on success
+            } catch (e) {
+              setSheetState(() => isSubmitting = false); // let them retry
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Couldn\u2019t place the order — please try again.')),
+                );
+              }
+            }
+          },
         ),
       ),
     );
@@ -122,6 +149,12 @@ class _TableOrderPageState extends State<TableOrderPage> {
     );
   }
 
+  void _openProfile() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const ProfilePage()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
@@ -135,7 +168,7 @@ class _TableOrderPageState extends State<TableOrderPage> {
           body: SafeArea(
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
+                constraints: const BoxConstraints(maxWidth: 680),
                 child: Container(
                   margin: const EdgeInsets.all(16),
                   clipBehavior: Clip.antiAlias,
@@ -153,7 +186,7 @@ class _TableOrderPageState extends State<TableOrderPage> {
                   ),
                   child: Column(
                     children: [
-                      _Header(tableId: _tableId, onViewOrders: _openPendingOrders),
+                      _Header(tableId: _tableId, onViewOrders: _openPendingOrders, onViewProfile: _openProfile),
                       Divider(height: 1, color: AppColors.border),
                       if (billRequested)
                         Container(
@@ -210,21 +243,12 @@ class _TableOrderPageState extends State<TableOrderPage> {
                                     onChanged: (v) => setState(() => _searchQuery = v),
                                   ),
                                 ),
-                                SizedBox(
-                                  height: 44,
-                                  child: ListView.separated(
-                                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                                    scrollDirection: Axis.horizontal,
-                                    itemCount: categories.length,
-                                    separatorBuilder: (_, __) => const SizedBox(width: 8),
-                                    itemBuilder: (context, i) {
-                                      final cat = categories[i];
-                                      return _CategoryPill(
-                                        label: cat,
-                                        selected: cat == _selectedCategory,
-                                        onTap: () => setState(() => _selectedCategory = cat),
-                                      );
-                                    },
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                                  child: _CategoryDropdown(
+                                    categories: categories,
+                                    selected: _selectedCategory,
+                                    onChanged: (cat) => setState(() => _selectedCategory = cat),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -236,25 +260,30 @@ class _TableOrderPageState extends State<TableOrderPage> {
                                       style: text.bodyMedium?.copyWith(color: AppColors.forestMuted),
                                     ),
                                   )
-                                      : GridView.builder(
-                                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: 2,
-                                      mainAxisSpacing: 12,
-                                      crossAxisSpacing: 12,
-                                      childAspectRatio: 0.62,
-                                    ),
-                                    itemCount: filtered.length,
-                                    itemBuilder: (context, i) {
-                                      final item = filtered[i];
-                                      final qty = _cart
-                                          .where((l) => l.item.id == item.id)
-                                          .fold(0, (sum, l) => sum + l.quantity);
-                                      return _MenuGridCard(
-                                        item: item,
-                                        quantity: qty,
-                                        onTapCard: billRequested ? null : () => _openItemDetail(item),
-                                        onQuickAdd: billRequested ? null : () => _quickAdd(item),
+                                      : LayoutBuilder(
+                                    builder: (context, constraints) {
+                                      final isNarrow = constraints.maxWidth < 420;
+                                      return GridView.builder(
+                                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                          crossAxisCount: isNarrow ? 2 : 3,
+                                          mainAxisSpacing: 10,
+                                          crossAxisSpacing: 10,
+                                          childAspectRatio: isNarrow ? 0.66 : 0.78,
+                                        ),
+                                        itemCount: filtered.length,
+                                        itemBuilder: (context, i) {
+                                          final item = filtered[i];
+                                          final qty = _cart
+                                              .where((l) => l.item.id == item.id)
+                                              .fold(0, (sum, l) => sum + l.quantity);
+                                          return _MenuGridCard(
+                                            item: item,
+                                            quantity: qty,
+                                            onTapCard: billRequested ? null : () => _openItemDetail(item),
+                                            onQuickAdd: billRequested ? null : () => _quickAdd(item),
+                                          );
+                                        },
                                       );
                                     },
                                   ),
@@ -268,6 +297,7 @@ class _TableOrderPageState extends State<TableOrderPage> {
                       _CartBar(
                         itemCount: _itemCount,
                         total: _cartTotal,
+                        identityLabel: _identityLabel,
                         onViewCart: (_cart.isEmpty || billRequested) ? null : _openCart,
                       ),
                     ],
@@ -285,51 +315,119 @@ class _TableOrderPageState extends State<TableOrderPage> {
 class _Header extends StatelessWidget {
   final String tableId;
   final VoidCallback onViewOrders;
+  final VoidCallback onViewProfile;
 
-  const _Header({required this.tableId, required this.onViewOrders});
+  const _Header({required this.tableId, required this.onViewOrders, required this.onViewProfile});
 
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 12, 16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.asset('assets/logo.jpg', width: 52, height: 52, fit: BoxFit.cover),
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 380;
+        final logoSize = isNarrow ? 40.0 : 52.0;
+
+        final tableBadge = Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.gold,
+            borderRadius: BorderRadius.circular(20),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Plates & Pours', style: text.displaySmall?.copyWith(fontSize: 19)),
+          child: Text(
+            'Table $tableId',
+            style: text.bodySmall?.copyWith(color: AppColors.forest, fontWeight: FontWeight.w600),
+          ),
+        );
+
+        final actionIcons = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              onPressed: onViewOrders,
+              icon: const Icon(Icons.receipt_long, color: AppColors.forest),
+              tooltip: 'Your orders',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              visualDensity: VisualDensity.compact,
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: onViewProfile,
+              icon: const Icon(Icons.person_outline, color: AppColors.forest),
+              tooltip: 'Profile',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
+        );
+
+        final titleBlock = Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Plates & Pours',
+                style: text.displaySmall?.copyWith(fontSize: isNarrow ? 16 : 19),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (!isNarrow) ...[
                 const SizedBox(height: 2),
-                Text('Garden Resto & Café', style: text.bodySmall),
+                Text('Garden Resto & Café', style: text.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+              ],
+            ],
+          ),
+        );
+
+        if (!isNarrow) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 12, 16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.asset('assets/logo.jpg', width: logoSize, height: logoSize, fit: BoxFit.cover),
+                ),
+                const SizedBox(width: 14),
+                titleBlock,
+                const SizedBox(width: 8),
+                tableBadge,
+                const SizedBox(width: 4),
+                actionIcons,
               ],
             ),
+          );
+        }
+
+        // Narrow layout: logo/title/icons on one line, table badge drops to
+        // its own line below instead of squeezing everything sideways.
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 12, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.asset('assets/logo.jpg', width: logoSize, height: logoSize, fit: BoxFit.cover),
+                  ),
+                  const SizedBox(width: 10),
+                  titleBlock,
+                  actionIcons,
+                ],
+              ),
+              const SizedBox(height: 10),
+              tableBadge,
+            ],
           ),
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.gold,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              'Table $tableId',
-              style: text.bodySmall?.copyWith(color: AppColors.forest, fontWeight: FontWeight.w600),
-            ),
-          ),
-          IconButton(
-            onPressed: onViewOrders,
-            icon: const Icon(Icons.receipt_long, color: AppColors.forest),
-            tooltip: 'Your orders',
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -370,33 +468,43 @@ class _SearchField extends StatelessWidget {
   }
 }
 
-class _CategoryPill extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
+class _CategoryDropdown extends StatelessWidget {
+  final List<String> categories;
+  final String selected;
+  final ValueChanged<String> onChanged;
 
-  const _CategoryPill({required this.label, required this.selected, required this.onTap});
+  const _CategoryDropdown({
+    required this.categories,
+    required this.selected,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? AppColors.forest : AppColors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? AppColors.forest : AppColors.border),
-        ),
-        child: Text(
-          label,
-          style: text.bodySmall?.copyWith(
-            color: selected ? Colors.white : AppColors.forest,
-            fontWeight: FontWeight.w600,
-          ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: selected,
+          isExpanded: true,
+          menuMaxHeight: 280,
+          icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.forestMuted),
+          style: text.bodyMedium,
+          dropdownColor: AppColors.white,
+          borderRadius: BorderRadius.circular(12),
+          items: [
+            for (final cat in categories)
+              DropdownMenuItem(value: cat, child: Text(cat)),
+          ],
+          onChanged: (value) {
+            if (value != null) onChanged(value);
+          },
         ),
       ),
     );
@@ -423,7 +531,7 @@ class _MenuGridCard extends StatelessWidget {
       onTap: onTapCard,
       borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(14),
@@ -468,7 +576,7 @@ class _MenuGridCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(item.name, style: text.bodyLarge, maxLines: 2, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 4),
-            Text(item.category, style: text.bodySmall),
+            Text(item.category, style: text.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
             const Spacer(),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -481,8 +589,8 @@ class _MenuGridCard extends StatelessWidget {
                   onTap: onQuickAdd,
                   borderRadius: BorderRadius.circular(16),
                   child: Container(
-                    width: 30,
-                    height: 30,
+                    width: 26,
+                    height: 26,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: onQuickAdd == null ? AppColors.border : AppColors.gold,
@@ -518,9 +626,15 @@ class _MenuGridCard extends StatelessWidget {
 class _CartBar extends StatelessWidget {
   final int itemCount;
   final double total;
+  final String identityLabel;
   final VoidCallback? onViewCart;
 
-  const _CartBar({required this.itemCount, required this.total, required this.onViewCart});
+  const _CartBar({
+    required this.itemCount,
+    required this.total,
+    required this.identityLabel,
+    required this.onViewCart,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -534,7 +648,7 @@ class _CartBar extends StatelessWidget {
         children: [
           Text(
             itemCount == 0
-                ? 'Browsing as guest'
+                ? identityLabel
                 : '$itemCount item${itemCount == 1 ? '' : 's'} · ₱${total.toStringAsFixed(2)}',
             style: text.bodyMedium,
           ),

@@ -28,32 +28,32 @@ ThemeData buildAppTheme() {
     dividerColor: AppColors.border,
     textTheme: TextTheme(
       displaySmall: GoogleFonts.fraunces(
-        fontSize: 28,
+        fontSize: 24,
         fontWeight: FontWeight.w600,
         color: AppColors.forest,
         height: 1.1,
       ),
       titleMedium: GoogleFonts.fraunces(
-        fontSize: 17,
+        fontSize: 15,
         fontWeight: FontWeight.w600,
         color: AppColors.forest,
       ),
       bodyLarge: GoogleFonts.workSans(
-        fontSize: 15.5,
+        fontSize: 14,
         fontWeight: FontWeight.w500,
         color: AppColors.forest,
       ),
       bodyMedium: GoogleFonts.workSans(
-        fontSize: 14.5,
+        fontSize: 13.5,
         color: AppColors.forest,
         height: 1.4,
       ),
       bodySmall: GoogleFonts.workSans(
-        fontSize: 13,
+        fontSize: 12,
         color: AppColors.forestMuted,
       ),
       labelLarge: GoogleFonts.workSans(
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: FontWeight.w600,
         color: AppColors.forest,
       ),

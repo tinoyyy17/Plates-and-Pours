@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "789517333866",
+    "project_id": "platesandpours",
+    "storage_bucket": "platesandpours.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:789517333866:android:25d4bd833a27022321e113",
+        "android_client_info": {
+          "package_name": "com.example.plates_and_pours_web"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCIEpW3jO-hGwsBp6YRgLRpt26oAR4dlnw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
