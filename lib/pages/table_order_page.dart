@@ -5,11 +5,17 @@ import '../services/order_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/cart_sheet.dart';
 import '../widgets/item_detail_sheet.dart';
+import '../widgets/star_rating.dart';
 import 'pending_orders_page.dart';
 import 'profile_page.dart';
 
+enum _SortMode { defaultOrder, bestSellers, topRated }
+
 class TableOrderPage extends StatefulWidget {
-  const TableOrderPage({super.key});
+  final String tableId;
+  final String sessionId;
+
+  const TableOrderPage({super.key, required this.tableId, required this.sessionId});
 
   @override
   State<TableOrderPage> createState() => _TableOrderPageState();
@@ -19,15 +25,17 @@ class _TableOrderPageState extends State<TableOrderPage> {
   final _orderService = OrderService();
   final List<CartLine> _cart = [];
   final _searchController = TextEditingController();
-  late final String _tableId;
+
+  String get _tableId => widget.tableId;
+  String get _sessionId => widget.sessionId;
 
   String _searchQuery = '';
   String _selectedCategory = 'All';
+  _SortMode _sortMode = _SortMode.defaultOrder;
 
   @override
   void initState() {
     super.initState();
-    _tableId = Uri.base.queryParameters['table'] ?? 'unknown';
   }
 
   @override
@@ -84,7 +92,7 @@ class _TableOrderPageState extends State<TableOrderPage> {
   }
 
   Future<void> _submitOrder() async {
-    final orderId = await _orderService.submitOrder(tableId: _tableId, cart: _cart);
+    final orderId = await _orderService.submitOrder(tableId: _tableId, sessionId: _sessionId, cart: _cart);
     if (!mounted) return;
     Navigator.of(context).pop();
     setState(() => _cart.clear());
@@ -128,6 +136,20 @@ class _TableOrderPageState extends State<TableOrderPage> {
     );
   }
 
+  /// Skips the cart — submits a one-item order immediately, independent of
+  /// whatever's already sitting in _cart (that cart is left untouched).
+  Future<void> _buyNow(MenuItem item, int quantity, String note) async {
+    final orderId = await _orderService.submitOrder(
+      tableId: _tableId,
+      sessionId: _sessionId,
+      cart: [CartLine(item: item, quantity: quantity, note: note)],
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Order sent to the kitchen — ref $orderId')),
+    );
+  }
+
   void _openItemDetail(MenuItem item) {
     showModalBottomSheet(
       context: context,
@@ -139,13 +161,14 @@ class _TableOrderPageState extends State<TableOrderPage> {
       builder: (context) => ItemDetailSheet(
         item: item,
         onAddToCart: (qty, note) => _addFromDetail(item, qty, note),
+        onBuyNow: (qty, note) => _buyNow(item, qty, note),
       ),
     );
   }
 
   void _openPendingOrders() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => PendingOrdersPage(tableId: _tableId)),
+      MaterialPageRoute(builder: (context) => PendingOrdersPage(tableId: _tableId, sessionId: _sessionId)),
     );
   }
 
@@ -160,12 +183,17 @@ class _TableOrderPageState extends State<TableOrderPage> {
     final text = Theme.of(context).textTheme;
 
     return StreamBuilder<bool>(
-      stream: _orderService.watchBillRequested(_tableId),
+      stream: _orderService.watchOrderingPaused(_tableId, _sessionId),
       builder: (context, billSnap) {
         final billRequested = billSnap.data ?? false;
 
         return Scaffold(
+          bottomNavigationBar: _BottomNav(
+            onTapOrders: _openPendingOrders,
+            onTapProfile: _openProfile,
+          ),
           body: SafeArea(
+            bottom: false,
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 680),
@@ -186,7 +214,7 @@ class _TableOrderPageState extends State<TableOrderPage> {
                   ),
                   child: Column(
                     children: [
-                      _Header(tableId: _tableId, onViewOrders: _openPendingOrders, onViewProfile: _openProfile),
+                      _Header(tableId: _tableId),
                       Divider(height: 1, color: AppColors.border),
                       if (billRequested)
                         Container(
@@ -229,6 +257,17 @@ class _TableOrderPageState extends State<TableOrderPage> {
                               return matchesCategory && matchesSearch;
                             }).toList();
 
+                            switch (_sortMode) {
+                              case _SortMode.bestSellers:
+                                filtered.sort((a, b) => b.soldCount.compareTo(a.soldCount));
+                                break;
+                              case _SortMode.topRated:
+                                filtered.sort((a, b) => b.avgRating.compareTo(a.avgRating));
+                                break;
+                              case _SortMode.defaultOrder:
+                                break;
+                            }
+
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
@@ -245,10 +284,25 @@ class _TableOrderPageState extends State<TableOrderPage> {
                                 ),
                                 Padding(
                                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                                  child: _CategoryDropdown(
-                                    categories: categories,
-                                    selected: _selectedCategory,
-                                    onChanged: (cat) => setState(() => _selectedCategory = cat),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 3,
+                                        child: _CategoryDropdown(
+                                          categories: categories,
+                                          selected: _selectedCategory,
+                                          onChanged: (cat) => setState(() => _selectedCategory = cat),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        flex: 2,
+                                        child: _SortDropdown(
+                                          selected: _sortMode,
+                                          onChanged: (mode) => setState(() => _sortMode = mode),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -269,7 +323,7 @@ class _TableOrderPageState extends State<TableOrderPage> {
                                           crossAxisCount: isNarrow ? 2 : 3,
                                           mainAxisSpacing: 10,
                                           crossAxisSpacing: 10,
-                                          childAspectRatio: isNarrow ? 0.66 : 0.78,
+                                          childAspectRatio: isNarrow ? 0.58 : 0.70,
                                         ),
                                         itemCount: filtered.length,
                                         itemBuilder: (context, i) {
@@ -314,10 +368,8 @@ class _TableOrderPageState extends State<TableOrderPage> {
 
 class _Header extends StatelessWidget {
   final String tableId;
-  final VoidCallback onViewOrders;
-  final VoidCallback onViewProfile;
 
-  const _Header({required this.tableId, required this.onViewOrders, required this.onViewProfile});
+  const _Header({required this.tableId});
 
   @override
   Widget build(BuildContext context) {
@@ -338,29 +390,6 @@ class _Header extends StatelessWidget {
             'Table $tableId',
             style: text.bodySmall?.copyWith(color: AppColors.forest, fontWeight: FontWeight.w600),
           ),
-        );
-
-        final actionIcons = Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              onPressed: onViewOrders,
-              icon: const Icon(Icons.receipt_long, color: AppColors.forest),
-              tooltip: 'Your orders',
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              visualDensity: VisualDensity.compact,
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              onPressed: onViewProfile,
-              icon: const Icon(Icons.person_outline, color: AppColors.forest),
-              tooltip: 'Profile',
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              visualDensity: VisualDensity.compact,
-            ),
-          ],
         );
 
         final titleBlock = Expanded(
@@ -384,7 +413,7 @@ class _Header extends StatelessWidget {
 
         if (!isNarrow) {
           return Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 12, 16),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -396,17 +425,15 @@ class _Header extends StatelessWidget {
                 titleBlock,
                 const SizedBox(width: 8),
                 tableBadge,
-                const SizedBox(width: 4),
-                actionIcons,
               ],
             ),
           );
         }
 
-        // Narrow layout: logo/title/icons on one line, table badge drops to
+        // Narrow layout: logo/title on one line, table badge drops to
         // its own line below instead of squeezing everything sideways.
         return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 12, 12),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -419,7 +446,6 @@ class _Header extends StatelessWidget {
                   ),
                   const SizedBox(width: 10),
                   titleBlock,
-                  actionIcons,
                 ],
               ),
               const SizedBox(height: 10),
@@ -428,6 +454,38 @@ class _Header extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Replaces the old header icon-buttons. "Menu" is always the highlighted
+/// tab since this page IS the menu; tapping "Your Orders" or "Profile"
+/// pushes that page and returns here on back, same pattern as the admin
+/// app's own bottom nav.
+class _BottomNav extends StatelessWidget {
+  final VoidCallback onTapOrders;
+  final VoidCallback onTapProfile;
+
+  const _BottomNav({required this.onTapOrders, required this.onTapProfile});
+
+  @override
+  Widget build(BuildContext context) {
+    return BottomNavigationBar(
+      currentIndex: 0,
+      onTap: (index) {
+        if (index == 1) onTapOrders();
+        if (index == 2) onTapProfile();
+      },
+      backgroundColor: AppColors.white,
+      selectedItemColor: AppColors.forest,
+      unselectedItemColor: AppColors.forestMuted,
+      showUnselectedLabels: true,
+      type: BottomNavigationBarType.fixed,
+      items: const [
+        BottomNavigationBarItem(icon: Icon(Icons.restaurant_menu), label: 'Menu'),
+        BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined), label: 'Your Orders'),
+        BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
+      ],
     );
   }
 }
@@ -511,6 +569,58 @@ class _CategoryDropdown extends StatelessWidget {
   }
 }
 
+class _SortDropdown extends StatelessWidget {
+  final _SortMode selected;
+  final ValueChanged<_SortMode> onChanged;
+
+  const _SortDropdown({required this.selected, required this.onChanged});
+
+  String _label(_SortMode mode) {
+    switch (mode) {
+      case _SortMode.defaultOrder:
+        return 'Sort: Default';
+      case _SortMode.bestSellers:
+        return 'Best sellers';
+      case _SortMode.topRated:
+        return 'Top rated';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<_SortMode>(
+          value: selected,
+          isExpanded: true,
+          menuMaxHeight: 280,
+          icon: const Icon(Icons.swap_vert, color: AppColors.forestMuted, size: 18),
+          style: text.bodyMedium?.copyWith(fontSize: 13),
+          dropdownColor: AppColors.white,
+          borderRadius: BorderRadius.circular(12),
+          items: [
+            for (final mode in _SortMode.values)
+              DropdownMenuItem(
+                value: mode,
+                child: Text(_label(mode), overflow: TextOverflow.ellipsis),
+              ),
+          ],
+          onChanged: (value) {
+            if (value != null) onChanged(value);
+          },
+        ),
+      ),
+    );
+  }
+}
+
 class _MenuGridCard extends StatelessWidget {
   final MenuItem item;
   final int quantity;
@@ -577,6 +687,8 @@ class _MenuGridCard extends StatelessWidget {
             Text(item.name, style: text.bodyLarge, maxLines: 2, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 4),
             Text(item.category, style: text.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 3),
+            StarRatingDisplay(average: item.avgRating, count: item.ratingCount),
             const Spacer(),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

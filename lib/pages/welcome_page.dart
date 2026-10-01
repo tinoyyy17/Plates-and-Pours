@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../services/session_service.dart';
 import '../theme/app_theme.dart';
 import 'login_page.dart';
 import 'table_order_page.dart';
@@ -13,19 +14,39 @@ class WelcomePage extends StatefulWidget {
 
 class _WelcomePageState extends State<WelcomePage> {
   late final String _tableId;
+  String? _sessionId;
   bool _checking = true;
+  bool _expired = false;
 
   @override
   void initState() {
     super.initState();
     _tableId = Uri.base.queryParameters['table'] ?? 'unknown';
-    _checkExistingSession();
+    _resolveSession();
+  }
+
+  /// Session validity is checked before anything else — an expired QR
+  /// means there's no point even offering the guest/login choice.
+  Future<void> _resolveSession() async {
+    final outcome = await SessionService().resolveSession(_tableId);
+    if (!mounted) return;
+
+    if (outcome.expired) {
+      setState(() {
+        _expired = true;
+        _checking = false;
+      });
+      return;
+    }
+
+    _sessionId = outcome.sessionId;
+    _checkExistingLogin();
   }
 
   /// If this browser already has a signed-in session (guest or logged in
   /// customer) from earlier in the visit, skip straight to the menu instead
   /// of asking them to choose again on every scan.
-  void _checkExistingSession() {
+  void _checkExistingLogin() {
     if (FirebaseAuth.instance.currentUser != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _goToMenu());
       return;
@@ -35,7 +56,9 @@ class _WelcomePageState extends State<WelcomePage> {
 
   void _goToMenu() {
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (context) => const TableOrderPage()),
+      MaterialPageRoute(
+        builder: (context) => TableOrderPage(tableId: _tableId, sessionId: _sessionId!),
+      ),
     );
   }
 
@@ -62,6 +85,41 @@ class _WelcomePageState extends State<WelcomePage> {
       return const Scaffold(
         backgroundColor: AppColors.pageBg,
         body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_expired) {
+      return Scaffold(
+        backgroundColor: AppColors.pageBg,
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 380),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.asset('assets/logo.jpg', width: 88, height: 88, fit: BoxFit.cover),
+                    ),
+                    const SizedBox(height: 20),
+                    const Icon(Icons.qr_code_2, size: 40, color: AppColors.forestMuted),
+                    const SizedBox(height: 12),
+                    Text('Your QR has expired', style: text.displaySmall, textAlign: TextAlign.center),
+                    const SizedBox(height: 8),
+                    Text(
+                      'This table\u2019s session has ended. Please scan the QR code on your table again to start a new order.',
+                      style: text.bodyMedium,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       );
     }
 

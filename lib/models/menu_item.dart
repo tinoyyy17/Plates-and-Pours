@@ -7,6 +7,9 @@ class MenuItem {
   final String? description;
   final List<String> ingredients;
   final bool available;
+  final double ratingSum;
+  final int ratingCount;
+  final int soldCount;
 
   MenuItem({
     required this.id,
@@ -17,7 +20,14 @@ class MenuItem {
     this.description,
     this.ingredients = const [],
     this.available = true,
+    this.ratingSum = 0,
+    this.ratingCount = 0,
+    this.soldCount = 0,
   });
+
+  /// 0 when nobody's rated it yet — check [ratingCount] before showing
+  /// this rather than displaying a misleading "0.0 stars".
+  double get avgRating => ratingCount == 0 ? 0 : ratingSum / ratingCount;
 
   factory MenuItem.fromFirestore(String id, Map<String, dynamic> data) {
     return MenuItem(
@@ -29,6 +39,9 @@ class MenuItem {
       description: data['description'],
       ingredients: List<String>.from(data['ingredients'] ?? const []),
       available: data['available'] ?? true,
+      ratingSum: ((data['rating_sum'] ?? 0) as num).toDouble(),
+      ratingCount: ((data['rating_count'] ?? 0) as num).toInt(),
+      soldCount: ((data['sold_count'] ?? 0) as num).toInt(),
     );
   }
 }

@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
 import '../models/menu_item.dart';
+import '../services/feedback_service.dart';
 import '../theme/app_theme.dart';
 
 class ItemDetailSheet extends StatefulWidget {
   final MenuItem item;
   final void Function(int quantity, String note) onAddToCart;
 
+  /// Skips the cart entirely — submits an order for just this item right
+  /// away. Optional so existing callers that don't pass it just don't get
+  /// the button.
+  final Future<void> Function(int quantity, String note)? onBuyNow;
+
   const ItemDetailSheet({
     super.key,
     required this.item,
     required this.onAddToCart,
+    this.onBuyNow,
   });
 
   @override
@@ -19,6 +26,7 @@ class ItemDetailSheet extends StatefulWidget {
 class _ItemDetailSheetState extends State<ItemDetailSheet> {
   int _quantity = 1;
   final _noteController = TextEditingController();
+  bool _buyingNow = false;
 
   @override
   void dispose() {
@@ -83,6 +91,36 @@ class _ItemDetailSheetState extends State<ItemDetailSheet> {
               ),
             ],
             const SizedBox(height: 20),
+            StreamBuilder<List<Map<String, dynamic>>>(
+              stream: FeedbackService().watchItemComments(item.id),
+              builder: (context, snap) {
+                final comments = snap.data ?? [];
+                if (comments.isEmpty) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Recent comments', style: text.titleMedium?.copyWith(fontSize: 14)),
+                      const SizedBox(height: 8),
+                      for (final c in comments)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppColors.cardBg,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '"${(c['comment'] ?? '').toString()}"',
+                            style: text.bodySmall,
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
             Text('Notes (allergies, special requests)', style: text.titleMedium?.copyWith(fontSize: 14)),
             const SizedBox(height: 8),
             TextField(
@@ -123,20 +161,64 @@ class _ItemDetailSheetState extends State<ItemDetailSheet> {
                   icon: Icons.add,
                   onTap: () => setState(() => _quantity = (_quantity + 1).clamp(1, 99)),
                 ),
-                const Spacer(),
-                ElevatedButton(
-                  onPressed: () {
-                    widget.onAddToCart(_quantity, _noteController.text.trim());
-                    Navigator.of(context).pop();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.gold,
-                    padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    elevation: 0,
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _buyingNow
+                        ? null
+                        : () {
+                      widget.onAddToCart(_quantity, _noteController.text.trim());
+                      Navigator.of(context).pop();
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.forest,
+                      side: const BorderSide(color: AppColors.border),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text('Add to cart', style: text.labelLarge?.copyWith(color: AppColors.forest)),
                   ),
-                  child: Text('Add to cart', style: text.labelLarge),
                 ),
+                if (widget.onBuyNow != null) ...[
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _buyingNow
+                          ? null
+                          : () async {
+                        setState(() => _buyingNow = true);
+                        try {
+                          await widget.onBuyNow!(_quantity, _noteController.text.trim());
+                          if (context.mounted) Navigator.of(context).pop();
+                        } catch (e) {
+                          if (mounted) {
+                            setState(() => _buyingNow = false);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Couldn’t place the order — please try again.')),
+                            );
+                          }
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.gold,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        elevation: 0,
+                      ),
+                      child: _buyingNow
+                          ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.forest),
+                      )
+                          : Text('Buy now', style: text.labelLarge),
+                    ),
+                  ),
+                ],
               ],
             ),
           ],
